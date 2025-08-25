@@ -1,0 +1,234 @@
+<!-- Inside your same <body> -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+</html>
+<div>
+    <h1 id="h"></h1>
+    <h3 id="leftMsg"></h3>
+
+    <!-- Connection controls -->
+    <button onclick="connect()">Create connection</button>
+    <button onclick="disconect()">Disconnect</button>
+
+    <!-- Room controls -->
+    <button id="roomCreate" onclick="showRoomForm()">Create Room</button>
+
+    <!-- Hidden form initially -->
+    <div id="roomForm" style="display:none; margin-top:10px;">
+        <input type="text" placeholder="Enter Room Name" id="roomNameInput">
+        <input type="text" placeholder="Enter Unique Id" id="roomIdInput">
+        <button id="submitRoom">Submit and Connect to Room</button>
+    </div>
+
+    <!-- this form is for user to check is it in room or not -->
+    <!-- add 2 input for user and 2 for room -->
+      <div id="privateForm" style="margin-top:20px;">
+            <h3>Private Chat</h3>
+            <input type="text" placeholder="Enter Username" id="privateUsername">
+            <input type="text" placeholder="Enter Unique User Id" id="privateUserId">
+            <input type="text" placeholder="Enter Private Room Name" id="privateRoomName">
+            <input type="text" placeholder="Enter Private Room Id" id="privateRoomId">
+            <button id="submitPrivate">Join Private Chat</button>
+        </div>
+
+        <form style="display: none;">
+            <input type="text" placeholder="Enter No of User u want" id="privateRoomId">
+            <button id="submitNoOfUser">Submit</button>
+        </form>
+
+
+    <p id="p"></p>
+
+    <!-- Chat controls -->
+    <input type="text" id="msg" placeholder="write something">
+    <button id="send">Send (default socket)</button>
+    <button id="sendMsgBtn">Send To Room</button>
+    <button id="leaveFromRoom">Exit from room</button>
+
+    <!-- for private chat -->
+    <button id="sendPrivateBtn">Send To Private</button>
+    <button id="disconectFromPrivateRoom">disconectFromPrivateRoom</button>
+
+    <ul id="chatArea"></ul>
+    <p id="room"></p>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const h = document.getElementById('h')
+    const leftMsg = document.getElementById('leftMsg')
+    let socket;
+    let socketRoom;
+    let socketPrivate;
+
+    const connect = () => {
+        if (socket && socket.connected) {
+            console.log('Already connected');
+            return
+        }
+
+        socket = io('http://localhost:3000/');
+
+        socket.on("connect_error", (err) => {
+            console.error("Connection failed:", err.message);
+        });
+
+        socket.on('broadcast', (count) => {
+            h.textContent = `${count.message}`
+        });
+
+        const msg = document.getElementById('msg');
+        const send = document.getElementById('send');
+        const chatArea = document.getElementById('chatArea');
+
+        socket.on('sendMsg', (msg) => {
+            const li = document.createElement('li');
+            li.innerText = msg;
+            chatArea.appendChild(li)
+        })
+
+        send.addEventListener('click', (e) => {
+            e.preventDefault();
+            const message = msg.value;
+            socket.emit('chat', message);
+            msg.value = ''
+        })
+    }
+
+    const disconect = () => {
+        if (socket) {
+            socket.disconnect()
+        }
+    }
+
+    let createdRoom = '';
+    let createdId = '';
+    let joinRoom = [];
+    let fullRoomName = ''
+    const showRoomForm = () => {
+        document.getElementById('roomForm').style.display = 'block';
+    }
+
+    document.getElementById('submitRoom').onclick = () => {
+        createdRoom = document.getElementById('roomNameInput').value.trim();
+        createdId = document.getElementById('roomIdInput').value.trim();
+
+        if (!createdRoom || !createdId) {
+            alert("Please enter both Room Name and Unique Id!");
+            return;
+        }
+
+        console.log("Created Room:", createdRoom, "Id:", createdId);
+        document.getElementById("p").textContent = `Created Room: ${createdRoom} (Id: ${createdId})`;
+
+        // send to server
+        if (!socketRoom || !socketRoom.connected) {
+            socketRoom = io("http://localhost:3000/room");
+
+            socketRoom.emit('createRoom', { roomName: createdRoom, id: createdId });
+            fullRoomName = `${createdRoom}-${createdId}`
+            socketRoom.on('alert', (msg) => {
+                alert(msg)
+            })
+
+            socketRoom.on('message', (msg) => {
+                console.log(msg)
+                const chatArea = document.getElementById('chatArea');
+                const li = document.createElement('li');
+                li.innerText = msg;
+                chatArea.appendChild(li);
+            });
+
+            document.getElementById('sendMsgBtn').onclick = () => {
+                const msgBox = document.getElementById('msg');
+                const message = msgBox.value.trim();
+                if (message) {
+                    socketRoom.emit('message', {msg:`${fullRoomName}--->${message}`});
+                    joinRoom.push(fullRoomName)
+                    msgBox.value = '';
+                }
+            };
+
+            if(socketRoom){
+                const leaveFromRoom = document.getElementById('leaveFromRoom');
+                
+                leaveFromRoom.addEventListener('click',()=>{
+                    socketRoom.emit('leave',fullRoomName)
+                    joinRoom.filter(r=>r!==fullRoomName)
+                })
+            }
+        }
+
+
+        // hide form
+        document.getElementById('roomForm').style.display = 'none';
+        document.getElementById('roomNameInput').value = '';
+        document.getElementById('roomIdInput').value = '';
+    }
+
+
+
+
+
+
+    document.getElementById('submitPrivate').onclick = () => {
+            const username = document.getElementById('privateUsername').value.trim();
+            const userId = document.getElementById('privateUserId').value.trim();
+            const roomName = document.getElementById('privateRoomName').value.trim();
+            const roomId = document.getElementById('privateRoomId').value.trim();
+
+            if (!username || !userId || !roomName || !roomId) {
+                alert("Please fill all fields for private chat!");
+                return;
+            }
+
+            if (!socketPrivate || !socketPrivate.connected) {
+                socketPrivate = io("http://localhost:3000/private");
+
+                socketPrivate.emit("createUser", { Username: username, id: userId, roomName, roomId });
+
+                socketPrivate.on("error", (msg) => {
+                    alert("Error: " + msg);
+                });
+
+                socketPrivate.on("roomJoined", (msg) => {
+                    const li = document.createElement("li");
+                    li.innerText = msg;
+                    document.getElementById("chatArea").appendChild(li);
+                });
+
+                socketPrivate.on("message", (msg) => {
+                    const li = document.createElement("li");
+                    li.innerText = "[Private] " + msg;
+                    document.getElementById("chatArea").appendChild(li);
+                });
+
+                document.getElementById("sendPrivateBtn").onclick = () => {
+                    const msgBox = document.getElementById("msg");
+                    const message = msgBox.value.trim();
+                    if (message) {
+                        socketPrivate.emit("message", message);
+                        msgBox.value = "";
+                    }
+                };
+            }
+        }
+        const disconectFromPrivateRoom = document.getElementById('disconectFromPrivateRoom')
+        disconectFromPrivateRoom.addEventListener('click',()=>{
+        if (socketPrivate) {
+            socketPrivate.disconnect()
+        }
+        })
+
+
+</script>
+</body>
