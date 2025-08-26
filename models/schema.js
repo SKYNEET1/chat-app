@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-const userSchema = new mongoose.Schema({
+const roomSchema = new mongoose.Schema({
     roomName:{
         type:String
     },
@@ -12,13 +12,16 @@ const userSchema = new mongoose.Schema({
         type:Number,
         default:0
     },
+    idOfTheParicipent:[{
+        type:Number
+    }],
     limit:{
         type:Number,
         default:0
     }
 })
 
-const privateMSGSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
     userName:{
         type:String
     },
@@ -29,8 +32,13 @@ const privateMSGSchema = new mongoose.Schema({
     inRoom:{
         type:Boolean,
         default:false
+    },
+    role:{
+        type:String,
+        enum:['user','admin','promoted'],
+        default:'user'
     }
 })
+const Room = mongoose.model('Room',roomSchema);
 const User = mongoose.model('User',userSchema);
-const Private = mongoose.model('Private',privateMSGSchema);
-module.exports = {User,Private}
+module.exports = {Room,User}

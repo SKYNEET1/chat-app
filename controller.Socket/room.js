@@ -1,4 +1,4 @@
-const {User, Private} = require('../models/schema')
+const {Room, User} = require('../models/schema')
 
 module.exports = function(io){
 const room = io.of('/room')
@@ -9,7 +9,7 @@ room.on('connection', (socket) => {
     socket.on('createRoom', async ({ roomName, id }) => {
         try {
 
-            const isRoom = await User.findOne({ id });
+            const isRoom = await Room.findOne({ id });
 
             console.log(isRoom)
             if (isRoom) {
@@ -25,7 +25,7 @@ room.on('connection', (socket) => {
 
             } else {
 
-                await User.create({ roomName, id });
+                await Room.create({ roomName, id });
                 const fullRoomName = `${roomName}-${id}`
                 socket.data.roomNM.push(fullRoomName) 
                 console.log(`${socket.id} created and joined room ${roomName}-${id}`);

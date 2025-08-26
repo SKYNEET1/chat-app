@@ -2,7 +2,8 @@
 module.exports = function(io){
 let count = 0;
 io.on('connection', (socket) => {
-    console.log(`user conected with socket id: ${socket.id}`);
+    console.log(`user conected with socket id: ${socket.id} , recovered ? `,socket.recovered);
+    // socket.recovered give false if the message is not recovered but if any failure and value recovered then it will give u true
     socket.on("error", (err) => {
         console.error("Socket error:", err);
     })
@@ -17,6 +18,10 @@ io.on('connection', (socket) => {
             io.emit('sendMsg', trimmsg)
         }
     })
+
+    // setInterval(()=>{
+    //     io.emit('sendMsg','hi there ')
+    // },5000)
 
     socket.on('disconnect', () => {
         count--;
