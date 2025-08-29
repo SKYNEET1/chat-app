@@ -1,4 +1,4 @@
-const { Room, User } = require('../models/schema')
+const { Room, User, Chat } = require('../models/schema')
 module.exports = function (io) {
 
     const customLimit = io.of('/customLimit');
@@ -50,18 +50,33 @@ module.exports = function (io) {
                         await User.create({ userName: Username, id, inRoom: true, role: roleSelect })
                     } else {
                         await User.updateOne({ id }, { inRoom: true, role: roleSelect });
-
                     }
                     isRoom.idOfTheParicipent.push(id);
                     await isRoom.save();
                     socket.join(`${roomName}-${roomId}`);
+                    const messages = await Chat.find({ roomId }).sort({ timestamp: 1 }).limit(10); 
+                    if(!messages){
+                        socket.emit('error','no history found');
+                        return;
+                    }
+                    messages.forEach((msg)=>{
+                    socket.emit('history', msg.text);
+                    })
                     socket.emit('roomJoined', `user-${Username} has joined existing room- ${socket.data.roomNM}`)
                 }
 
                 if (!socket.data.roomNM) {
                     console.log('No room name to create a room')
                 } else {
-                    socket.on('message', (msg) => {
+                    socket.on('message', async (msg) => {
+                        console.log(msg)
+                        const sender = await User.findOne({id:socket.data.userIdForDis})
+                        await Chat.create({
+                            roomId: socket.data.roomIdForDis,
+                            senderId: socket.data.userIdForDis,
+                            senderName: sender.userName,
+                            text: String(msg)
+                        })
                         console.log(msg)
                         customLimit.in(socket.data.roomNM).emit('message', msg);
                     });
@@ -79,7 +94,6 @@ module.exports = function (io) {
                 socket.emit('error', 'Only admin/prometed person can kick users!');
                 return;
             }
-            console.log(...customLimit.sockets.values())
             const targetedUser = [...customLimit.sockets.values()].find((toBeKickUser) => {
                 return toBeKickUser.data.userIdForDis === idToBeKicked && toBeKickUser.data.roomNM === socket.data.roomNM
             })
@@ -112,8 +126,8 @@ module.exports = function (io) {
             }
 
             const isRole = await User.findOne({ id: idToBeTargeted })
-            if(!isRole){
-                socket.emit('error','User Id not found')
+            if (!isRole) {
+                socket.emit('error', 'User Id not found')
             }
 
             if (socket.data.role !== 'admin') {
@@ -146,8 +160,8 @@ module.exports = function (io) {
         socket.on('disconnect', async () => {
             if (socket.data.roomIdForDis && socket.data.userIdForDis) {
                 const room = await Room.findOne({ id: socket.data.roomIdForDis });
-                if(!room){
-                    socket.emit('error','room not found to disconnect')
+                if (!room) {
+                    socket.emit('error', 'room not found to disconnect')
                 }
                 if (room && room.noOfSocket > 0) {
                     room.noOfSocket -= 1;
@@ -160,4 +174,8 @@ module.exports = function (io) {
             socket.to(socket.data.roomNM).emit('message', 'user Disconected')
         })
     })
-}   
+}
+
+
+// history if socket is disconected
+// store the msg..
